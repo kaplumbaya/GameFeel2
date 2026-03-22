@@ -19,6 +19,12 @@ public partial class Stick : Node3D
 	
 	float yaw = 0f;
 	Vector3 offset = new Vector3(0, 1.25f, 0);
+	
+	float inputTimer = 0f;
+	[Export] float recenterDelay = 3f;
+	[Export] float recenterSpeed = 2f;
+
+	bool isRecentering = false;
 
 	public override void _Ready()
 	{
@@ -31,28 +37,52 @@ public partial class Stick : Node3D
 		{
 			moveTarget = defaultMoveTarget.Position;
 			Vector2 input = Input.GetVector("cam_left", "cam_right", "cam_up", "cam_down");
-
+			
+			if (input.Length() > 0.01f)
+			{
+				inputTimer = 0f;
+				isRecentering = true;
+			}
+			else
+			{
+				inputTimer += (float)delta;
+			}
+			
 			pitch += input.Y;
 			yaw += input.X;
 			
 			pitch = Mathf.Clamp(pitch, -Mathf.Pi / .25f, Mathf.Pi / .25f);
 			
-			Rotation = new Vector3(pitch * camSpeed ,yaw * camSpeed, 0);
+			Vector3 targetRotation;
+
+			if (isRecentering)
+			{
+				Vector3 forward = defaultMoveTarget.GlobalTransform.Basis.Z;
+
+				float targetYaw = Mathf.Atan2(forward.X, forward.Z);
+
+				yaw = Mathf.LerpAngle(yaw, targetYaw, (float)delta * recenterSpeed);
+
+				pitch = Mathf.Lerp(pitch, 0f, (float)delta * recenterSpeed);
+			}
+
+			targetRotation = new Vector3(pitch * camSpeed, yaw * camSpeed, 0);
+			Rotation = targetRotation;
 			
 			GlobalPosition = moveTarget + offset;
 			
-			UpdateCamera();
+			UpdateCamera(delta);
 		}
 		else 
 		{
-			UpdateCamera();
+			UpdateCamera(delta);
 			cam.Position = Vector3.Zero;
 			Position = moveTarget;
 			LookAt(lookTarget.Position, Vector3.Up);
 		}
 	}
 	
-	void UpdateCamera()
+	void UpdateCamera(double delta)
 	{
 		var space = GetWorld3D().DirectSpaceState;
 		
@@ -71,8 +101,8 @@ public partial class Stick : Node3D
 		
 		for (int i = 0; i < sideRayCount; i++)
 		{
-			float t = (float)(i + 1 )/ sideRayCount;
-			float spread = raySpread * t;
+			float lerpT = (float)(i + 1 )/ sideRayCount;
+			float spread = raySpread * lerpT;
 			
 			Vector3 leftDir = (backward - right * spread).Normalized();
 			// DebugDraw3D.DrawLine(origin, origin + leftDir * maxDistance, new Color(1, 0, 0));
@@ -89,7 +119,8 @@ public partial class Stick : Node3D
 		
 		Vector3 targetLocalPos = new Vector3(targetX, 0, targetDistance);
 		
-		cam.Position = cam.Position.Lerp(targetLocalPos, 0.15f);
+		float t = 1f - Mathf.Exp(-10f * (float)delta);
+		cam.Position = cam.Position.Lerp(targetLocalPos, t);
 		
 		cam.LookAt(lookTarget.GlobalPosition, Vector3.Up);
 	}
@@ -119,5 +150,4 @@ public partial class Stick : Node3D
 		moveTarget = position;
 		allowInput = false;
 	}
-
 }

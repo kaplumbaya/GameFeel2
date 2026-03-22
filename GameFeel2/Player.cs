@@ -88,17 +88,23 @@ public partial class Player : CharacterBody3D
 
 	// Movement Logic
 	private void HandleMovement(ref Vector3 velocity, Vector3 direction, float delta)
-{
-	float speed = isDucking ? DuckSpeed : MoveSpeed;
-	Vector3 targetVelocity = direction * speed;
-	Vector3 horizontalVelocity = new Vector3(velocity.X, 0, velocity.Z);
-	
-	horizontalVelocity = targetVelocity;
+	{
+		float speed = isDucking ? DuckSpeed : MoveSpeed;
+		Vector3 horizontalVelocity = new Vector3(velocity.X, 0, velocity.Z);
+		if (direction.Length() > 0)
+		{
+			Vector3 targetVelocity = direction * speed;
+			horizontalVelocity = horizontalVelocity.Lerp(targetVelocity, Acceleration * delta);
+		}
+		else
+		{
+			horizontalVelocity = horizontalVelocity.Lerp(Vector3.Zero, Deceleration * delta);
+		}
 
-	velocity.X = horizontalVelocity.X;
-	velocity.Z = horizontalVelocity.Z;
-}
-	// Gravity + Hang Time
+		velocity.X = horizontalVelocity.X;
+		velocity.Z = horizontalVelocity.Z;
+	}
+
 	private void HandleGravity(ref Vector3 velocity, float delta)
 	{
 		if (!IsOnFloor())
@@ -108,8 +114,12 @@ public partial class Player : CharacterBody3D
 			else
 				velocity.Y -= Gravity * delta;
 		}
+		else
+		{
+			if (velocity.Y < 0)
+				velocity.Y = -0.1f;
+		}
 	}
-
 	// Coyote Time
 	private void HandleCoyoteTime(float delta)
 	{
@@ -180,12 +190,13 @@ public partial class Player : CharacterBody3D
 	{
 		Vector3 horizontalVelocity = Velocity;
 		horizontalVelocity.Y = 0;
-		if (horizontalVelocity.Length() < 0.1f)
-		   
+		
+		if (horizontalVelocity.Length() < 0.05f)
 			return;
-		float angle = Mathf.Atan2(horizontalVelocity.X, horizontalVelocity.Z);
+		
+		float targetAngle = Mathf.Atan2(horizontalVelocity.X, horizontalVelocity.Z);
 		Vector3 rot = gfx.Rotation;
-		rot.Y = Mathf.LerpAngle(rot.Y, angle, 10f * delta);
+		rot.Y = Mathf.LerpAngle(rot.Y, targetAngle, 8f * delta);
 		gfx.Rotation = rot;
+		}
 	}
-}
